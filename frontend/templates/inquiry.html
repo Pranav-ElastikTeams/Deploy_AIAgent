@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Complaint & Policy Inquiry</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/sidebar.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    {% include 'sidebar.html' %}
+    <div id="chat-container">
+      <h1>Complaint & Policy Inquiry</h1>
+      <div id="chat-box"></div>
+      <div class="input-container">
+        <input
+          type="text"
+          id="user-input"
+          placeholder="Ask about a complaint or policy..."
+        />
+        <button id="send-btn">Send</button>
+      </div>
+    </div>
+    <script src="/static/sidebar.js" defer></script>
+    <script>
+      const chatBox = document.getElementById("chat-box");
+      const userInput = document.getElementById("user-input");
+      const sendBtn = document.getElementById("send-btn");
+      let conversationHistory = [];
+
+      function appendUserMessage(msg) {
+        chatBox.innerHTML += `<div><b>You:</b> ${msg}</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        conversationHistory.push({ role: 'user', message: msg });
+      }
+      
+      function appendAgentMessage(msg) {
+        chatBox.innerHTML += `<div><b>Agent:</b> ${msg}</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        conversationHistory.push({ role: 'agent', message: msg });
+      }
+
+      function showAgentGreeting() {
+        chatBox.innerHTML = `<div><b>Agent:</b> Hello! You can ask about the status or details of a complaint (e.g., "What is the status of complaint ETH-20240601-1234?") or ask general questions about policy, law, or procedures. I'll answer using our database or the Gemini AI as appropriate.</div>`;
+      }
+
+      // Add loader logic
+      function showAgentLoaderWithDelay() {
+        if (document.getElementById('agent-loader')) return;
+        window._agentLoaderTimeout = setTimeout(() => {
+          if (!document.getElementById('agent-loader')) {
+            const loaderDiv = document.createElement('div');
+            loaderDiv.id = 'agent-loader';
+            loaderDiv.innerHTML = `<b>Agent:</b><span class="three-dot-loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></span>`;
+            chatBox.appendChild(loaderDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+          }
+        }, 400);
+      }
+      
+      function removeAgentLoader() {
+        clearTimeout(window._agentLoaderTimeout);
+        const loader = document.getElementById('agent-loader');
+        if (loader) loader.remove();
+      }
+
+      sendBtn.onclick = async function (e) {
+        e.preventDefault();
+        let message = userInput.value;
+        if (!message.trim()) return;
+        appendUserMessage(message);
+        userInput.value = "";
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        showAgentLoaderWithDelay();
+        const response = await fetch("/inquiry_chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, history: conversationHistory }),
+        });
+        const data = await response.json();
+        removeAgentLoader();
+        appendAgentMessage(data.response);
+      };
+
+      window.onload = function () {
+        showAgentGreeting();
+      };
+
+      userInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !sendBtn.disabled) {
+          e.preventDefault();
+          sendBtn.click();
+        }
+      });
+    </script>
+  </body>
+</html> 

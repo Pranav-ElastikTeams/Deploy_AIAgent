@@ -49,7 +49,7 @@
     backdrop-filter: blur(20px);
     border: 1px solid rgba(148, 163, 184, 0.2);
     width: 100%;
-    max-width: 520px;
+    max-width: 800px;
     border-radius: 24px;
     box-shadow: 
       0 25px 50px -12px rgba(0, 0, 0, 0.5),
@@ -542,4 +542,48 @@
       border: 2px solid #fff;
       color: #fff;
     }
+  }
+  
+  #file-new-complaint-btn {
+    width: 100%;
+    padding: 1rem 1.75rem;
+    background: linear-gradient(135deg, #64ffda, #7c3aed);
+    color: #0a0e27;
+    border: none;
+    border-radius: 16px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    min-width: 90px;
+    position: relative;
+    overflow: hidden;
+    margin-top: 0.5rem;
+    box-sizing: border-box;
+    display: block;
+  }
+  
+  #file-new-complaint-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+  }
+  
+  #file-new-complaint-btn:hover::before {
+    left: 100%;
+  }
+  
+  #file-new-complaint-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(100, 255, 218, 0.4), 0 0 30px rgba(124, 58, 237, 0.3);
+    background: linear-gradient(135deg, #7c3aed, #ec4899);
+  }
+  
+  #file-new-complaint-btn:active {
+    transform: translateY(-1px);
   }

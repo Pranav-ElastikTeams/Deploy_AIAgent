@@ -1,0 +1,12 @@
+For each input case below, extract the required data from the answer based on the question context:
+For date-related questions, extract a valid date in YYYY-MM-DD format.
+For email-related questions, extract a valid email address.
+For evidence-related questions, if the user says they have no evidence, return 'No evidence'. Otherwise, extract the type of evidence (e.g., 'CCTV Footage', 'Witness Testimony', 'Audio Recording', 'Email Records', 'Photograph', etc.)
+For name-related questions, extract the name of the person or organization.
+For staff_role-related questions, extract the role/designation of the reported person (e.g., 'Manager', 'Subordinate').
+If the required value cannot be confidently determined, return null.
+Output only the extracted value for each case.
+
+Input Case
+Question: {question}
+Answer: {answer} 

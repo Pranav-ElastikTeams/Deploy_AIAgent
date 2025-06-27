@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ethics Case Screener</title>
     <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/sidebar.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body>
+    {% include 'sidebar.html' %}
     <div id="chat-container">
       <h1>Ethics Case Screener</h1>
       <div id="chat-box"></div>
@@ -21,6 +23,7 @@
         <button id="send-btn" style="display: none">Send</button>
       </div>
     </div>
+    <script src="/static/sidebar.js" defer></script>
     <script>
       const chatBox = document.getElementById("chat-box");
       const userInput = document.getElementById("user-input");
@@ -66,6 +69,10 @@
       function appendAgentMessage(msg) {
         chatBox.innerHTML += `<div><b>Agent:</b> ${msg}</div>`;
         chatBox.scrollTop = chatBox.scrollHeight;
+        // If complaint is successfully logged, show the new complaint button
+        if (msg.includes('Your complaint has been logged') || msg.includes('Thank you. Your complaint has been logged')) {
+          showFileNewComplaintButton();
+        }
       }
 
       function showComplaintTypeInChat() {
@@ -238,6 +245,14 @@
           sendBtn.click();
         }
       });
+
+      function showFileNewComplaintButton() {
+        const inputContainer = document.querySelector('.input-container');
+        inputContainer.innerHTML = `<button id="file-new-complaint-btn">File New Complaint</button>`;
+        document.getElementById('file-new-complaint-btn').onclick = function() {
+          window.location.reload();
+        };
+      }
     </script>
   </body>
 </html>

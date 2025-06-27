@@ -1,9 +1,10 @@
 from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 import os
-from db.db_utils import init_db
-from langchain_agent.agent import get_agent_response
+from db.db_utils import init_db, get_db_session
+from langchain_agent.agent import get_agent_response, get_inquiry_response
 import json
+from db.models import Complaint
 
 load_dotenv()
 
@@ -35,9 +36,19 @@ def complaint_types():
         types = json.load(f)
     return jsonify(types)
 
+@app.route('/inquiry')
+def inquiry():
+    return render_template('inquiry.html')
+
+@app.route('/inquiry_chat', methods=['POST'])
+def inquiry_chat():
+    user_message = request.json.get('message')
+    history = request.json.get('history', [])
+    response = get_inquiry_response(user_message, history)
+    return jsonify({'response': response})
+
 # if __name__ == '__main__':
 #     app.run(debug=True) 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=8000) 

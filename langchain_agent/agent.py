@@ -23,18 +23,13 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 with open(os.path.join(DATA_DIR, 'officers_name.json')) as f:
     OFFICERS = json.load(f)
 
+def load_prompt_template(filename):
+    with open(os.path.join(os.path.dirname(__file__), 'prompt_templates', filename), 'r', encoding='utf-8') as f:
+        return f.read()
+
 def extract_field_value(question, answer, field):
-    prompt = (
-        f"For each input case below, extract the required data from the answer based on the question context:\n"
-        f"For date-related questions, extract a valid date in YYYY-MM-DD format.\n"
-        f"For email-related questions, extract a valid email address.\n"
-        f"For evidence-related questions, if the user says they have no evidence, return 'No evidence'. Otherwise, extract the type of evidence (e.g., 'CCTV Footage', 'Witness Testimony', 'Audio Recording', 'Email Records', 'Photograph', etc.)\n"
-        f"For name-related questions, extract the name of the person or organization.\n"
-        f"For staff_role-related questions, extract the role/designation of the reported person (e.g., 'Manager', 'Subordinate').\n"
-        f"If the required value cannot be confidently determined, return null.\n"
-        f"Output only the extracted value for each case.\n\n"
-        f"Input Case\nQuestion: {question}\nAnswer: {answer}"
-    )
+    prompt_template = load_prompt_template('field_extraction_prompt.txt')
+    prompt = prompt_template.format(question=question, answer=answer, field=field)
     resp = model.generate_content(prompt)
     print(f"\n[Gemini Extraction] Field: {field}, Prompt: {prompt}\nResponse: {resp.text.strip()}\n\n")
     value = resp.text.strip()
@@ -55,12 +50,8 @@ def get_agent_response(user_message, conversation_state):
         # Save the complaint type from the first user message
         complaint_type = user_message.strip()
         conversation_state['collected']['complaint_type'] = complaint_type
-        # Ask Gemini for a list of questions for this complaint type
-        prompt = (
-            f"Given the selected incident type is {complaint_type}, generate a list of questions to gather data for the following fields:\n"
-            f"complainant (String)\ncomplainant_email (String)\nName of the person being complained against (String)\nRole of the person being complained against (String)\ndate when the incident occurred (Date)\ndetailed summary of the incident (Text)\nevidence provided (String)\n"
-            f"Output only the list of questions. No explanations. Questions should be relevant to a {complaint_type} incident."
-        )
+        prompt_template = load_prompt_template('complaint_questions_prompt.txt')
+        prompt = prompt_template.format(complaint_type=complaint_type)
         resp = model.generate_content(prompt)
         print(f"\n[Gemini Extraction] Prompt: {prompt}\nResponse: {resp.text.strip()}\n")
         questions = [q.lstrip('*- ').strip() for q in resp.text.strip().split('\n') if q.strip()]
@@ -94,12 +85,17 @@ def get_agent_response(user_message, conversation_state):
             extracted = extract_field_value(question, user_message, field)
             if not extracted:
                 return (question, conversation_state)
-            # For date, validate format
+            # For date, validate format and ensure not in the future
             if field == 'date':
                 try:
-                    datetime.strptime(extracted, '%Y-%m-%d')
+                    date_obj = datetime.strptime(extracted, '%Y-%m-%d').date()
+                    if date_obj > datetime.utcnow().date():
+                        return (question, conversation_state)
                 except Exception:
                     return (question, conversation_state)
+            # For email, convert to lowercase
+            if field == 'complainant_email' and extracted:
+                extracted = extracted.lower()
             collected[field] = extracted
         conversation_state['collected'] = collected
         conversation_state['current_q'] += 1
@@ -146,3 +142,43 @@ def get_agent_response(user_message, conversation_state):
             return (f"Error logging complaint: {str(e)}", conversation_state)
     else:
         return ("Your complaint has already been submitted. For a new complaint, please refresh the page.", conversation_state)
+
+def get_inquiry_response(user_message, history=None):
+    # Always fetch latest complaints data from the database
+    from db.db_utils import get_db_session
+    from db.models import Complaint
+    session = get_db_session()
+    complaints = session.query(Complaint).all()
+    session.close()
+    def serialize(complaint):
+        return {
+            'complaint_id': complaint.complaint_id,
+            'date': str(complaint.date),
+            'complainant': complaint.complainant,
+            'complainant_email': complaint.complainant_email,
+            'complaint_type': complaint.complaint_type,
+            'subject': complaint.subject,
+            'details_summary': complaint.details_summary,
+            'evidence_provided': complaint.evidence_provided,
+            'status': complaint.status,
+            'assigned_officer': complaint.assigned_officer,
+            'staff_role': complaint.staff_role,
+            'created_at': str(complaint.created_at)
+        }
+    complaints_data = [serialize(c) for c in complaints]
+    import json as _json
+    complaints_json = _json.dumps(complaints_data, ensure_ascii=False)
+    # Format conversation history
+    history_text = ""
+    if history:
+        for turn in history:
+            if turn.get('role') == 'user':
+                history_text += f"User: {turn.get('message','')}\n"
+            elif turn.get('role') == 'agent':
+                history_text += f"Agent: {turn.get('message','')}\n"
+    prompt_template = load_prompt_template('inquiry_workflow_prompt.txt')
+    prompt = prompt_template.format(complaints_data=complaints_json, user_question=user_message, conversation_history=history_text)
+    print('\n--- Gemini INPUT PROMPT ---\n', prompt, '\n--------------------------\n')
+    resp = model.generate_content(prompt)
+    print('\n--- Gemini OUTPUT RESPONSE ---\n', resp.text.strip(), '\n-----------------------------\n')
+    return resp.text.strip()
