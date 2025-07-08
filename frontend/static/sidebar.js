@@ -41,11 +41,7 @@ document.addEventListener('keydown', (e) => {
 function highlightActiveNav() {
     const path = window.location.pathname;
     navButtons.forEach(btn => btn.classList.remove('active'));
-    if (path === '/inquiry') {
-        document.getElementById('inquireComplaintBtn').classList.add('active');
-    } else {
-        document.getElementById('logComplaintBtn').classList.add('active');
-    }
+    document.getElementById('logComplaintBtn').classList.add('active');
 }
 highlightActiveNav();
 

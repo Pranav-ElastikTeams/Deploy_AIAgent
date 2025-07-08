@@ -587,3 +587,192 @@
   #file-new-complaint-btn:active {
     transform: translateY(-1px);
   }
+  
+  /* Audio Controls Container */
+  .audio-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: center;
+    margin: 1rem 0;
+  }
+  
+  /* Base button styles for both mic and speaker */
+  .audio-btn {
+    width: 52px;
+    height: 52px;
+    border: 2px solid rgba(100, 255, 218, 0.3);
+    border-radius: 16px;
+    background: rgba(2, 8, 23, 0.8);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .audio-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(100, 255, 218, 0.1), transparent);
+    transition: left 0.5s;
+  }
+  .audio-btn:hover::before {
+    left: 100%;
+  }
+  .audio-btn:hover {
+    border-color: #64ffda;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(100, 255, 218, 0.2);
+  }
+  .audio-btn:active {
+    transform: translateY(-1px);
+  }
+  
+  /* Microphone specific styles */
+  .mic-btn {
+    position: relative;
+  }
+  .mic-btn.active {
+    background: linear-gradient(135deg, #64ffda, #7c3aed);
+    border-color: #64ffda;
+    box-shadow: 0 0 20px rgba(100, 255, 218, 0.4);
+  }
+  .mic-btn.active .mic-icon {
+    color: #0a0e27;
+  }
+  .mic-btn.recording {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(100, 255, 218, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(100, 255, 218, 0.8);
+    }
+  }
+  
+  /* Speaker specific styles */
+  .speaker-btn.active {
+    background: linear-gradient(135deg, #7c3aed, #ec4899);
+    border-color: #ec4899;
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.4);
+  }
+  .speaker-btn.active .speaker-icon {
+    color: #0a0e27;
+  }
+  .speaker-btn.playing {
+    animation: soundWave 1s ease-in-out infinite;
+  }
+  @keyframes soundWave {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+  
+  /* Icon styles */
+  .mic-icon, .speaker-icon {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: #e2e8f0;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Disabled state */
+  .audio-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .audio-btn:disabled:hover {
+    border-color: rgba(100, 255, 218, 0.3);
+    transform: none;
+    box-shadow: none;
+  }
+  
+  /* Status indicators */
+  .status-text {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-top: 0.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+  .status-text.active {
+    color: #64ffda;
+    text-shadow: 0 0 10px rgba(100, 255, 218, 0.3);
+  }
+  
+  /* Mobile responsiveness */
+  @media (max-width: 640px) {
+    .audio-controls {
+      gap: 0.75rem;
+    }
+    .audio-btn {
+      width: 48px;
+      height: 48px;
+    }
+    .mic-icon, .speaker-icon {
+      width: 18px;
+      height: 18px;
+    }
+    .status-text {
+      font-size: 0.8rem;
+    }
+  }
+  
+  /* Speaker button in agent message (top-right) */
+  .agent-message {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    position: relative;
+    padding: 1rem 1.5rem 1rem 1.25rem;
+    gap: 0;
+  }
+  .agent-message-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    word-break: break-word;
+    max-width: 600px;
+    line-height: 1.7;
+    text-align: left;
+    font-size: 1rem;
+    margin-left: 0.25rem;
+    margin-right: 0.5rem;
+  }
+  .agent-message-content b {
+    margin-right: 0.5em;
+    margin-bottom: 0;
+    display: inline;
+  }
+  .agent-message .speaker-btn.audio-btn {
+    position: static;
+    align-self: flex-start;
+    margin-left: 16px;
+    margin-top: 2px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0;
+    z-index: 2;
+  }
+  .agent-message .speaker-btn .speaker-icon {
+    width: 16px;
+    height: 16px;
+  }

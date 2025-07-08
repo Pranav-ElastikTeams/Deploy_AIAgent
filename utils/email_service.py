@@ -50,7 +50,7 @@ def send_ethics_complaint_email(to_email: str, complainant: str, complaint_data:
                     </tr>
                     <tr style="border-bottom: 1px solid #e8ecf0;">
                         <td style="padding: 12px 15px 12px 0; font-weight: 600; color: #2c3e50; vertical-align: top;">Subject:</td>
-                        <td style="padding: 12px 0; color: #555;">{complaint_data['Subject']}</td>
+                        <td style="padding: 12px 0; color: #555;">{complaint_data.get('Victim Name', '')} (Victim), {complaint_data.get('Suspect Name', '')} (Suspect)</td>
                     </tr>
                     <tr style="border-bottom: 1px solid #e8ecf0;">
                         <td style="padding: 12px 15px 12px 0; font-weight: 600; color: #2c3e50; vertical-align: top;">Date Submitted:</td>
@@ -67,6 +67,18 @@ def send_ethics_complaint_email(to_email: str, complainant: str, complaint_data:
                     <tr style="border-bottom: 1px solid #e8ecf0;">
                         <td style="padding: 12px 15px 12px 0; font-weight: 600; color: #2c3e50; vertical-align: top;">Assigned Investigator:</td>
                         <td style="padding: 12px 0; color: #555;">{complaint_data['Assigned To']}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #e8ecf0;">
+                        <td style="padding: 12px 15px 12px 0; font-weight: 600; color: #2c3e50; vertical-align: top;">Victim Name:</td>
+                        <td style="padding: 12px 0; color: #555;">{complaint_data.get('Victim Name', '')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #e8ecf0;">
+                        <td style="padding: 12px 15px 12px 0; font-weight: 600; color: #2c3e50; vertical-align: top;">Suspect Name:</td>
+                        <td style="padding: 12px 0; color: #555;">{complaint_data.get('Suspect Name', '')}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #e8ecf0;">
+                        <td style="padding: 12px 15px 12px 0; font-weight: 600; color: #2c3e50; vertical-align: top;">Relation:</td>
+                        <td style="padding: 12px 0; color: #555;">{complaint_data.get('Relation', '')}</td>
                     </tr>
                     <tr>
                         <td style="padding: 12px 15px 12px 0; font-weight: 600; color: #2c3e50; vertical-align: top;">Current Status:</td>

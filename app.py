@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, session
 from dotenv import load_dotenv
 import os
 from db.db_utils import init_db, get_db_session
-from langchain_agent.agent import get_agent_response, get_inquiry_response
+from langchain_agent.supervisor import supervisor_route
 import json
 from db.models import Complaint
 
@@ -21,13 +21,13 @@ def index():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json.get('message')
-    # Retrieve or initialize conversation state from session
-    conversation_state = session.get('conversation_state', {})
-    response, updated_state = get_agent_response(user_message, conversation_state)
-    # Update session with new state
-    session['conversation_state'] = updated_state
-    return jsonify({'response': response})
+    data = request.get_json()
+    user_message = data.get('message', '')
+    # Get or initialize session_context
+    session_context = session.get('session_context', None)
+    response, new_session_context, agent_type = supervisor_route(user_message, session_context)
+    session['session_context'] = new_session_context
+    return jsonify({'response': response, 'agent': agent_type})
 
 @app.route('/complaint_types')
 def complaint_types():
@@ -40,15 +40,8 @@ def complaint_types():
 def inquiry():
     return render_template('inquiry.html')
 
-@app.route('/inquiry_chat', methods=['POST'])
-def inquiry_chat():
-    user_message = request.json.get('message')
-    history = request.json.get('history', [])
-    response = get_inquiry_response(user_message, history)
-    return jsonify({'response': response})
+if __name__ == '__main__':
+    app.run(debug=True) 
 
 # if __name__ == '__main__':
-#     app.run(debug=True) 
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000) 
+#     app.run(host='0.0.0.0', port=8000)

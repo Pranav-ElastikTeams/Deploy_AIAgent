@@ -13,7 +13,15 @@
     <div id="chat-container">
       <h1>Ethics Case Screener</h1>
       <div id="chat-box"></div>
-      <div class="input-container">
+      <div class="input-container audio-controls">
+        <button class="audio-btn mic-btn" id="mic-btn" title="Speak" style="display: none; margin-right: 8px;">
+          <svg class="mic-icon" viewBox="0 0 24 24">
+            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
         <input
           type="text"
           id="user-input"
@@ -22,17 +30,19 @@
         />
         <button id="send-btn" style="display: none">Send</button>
       </div>
+      <div class="status-text" id="status-text">Click mic to speak or type your message</div>
     </div>
     <script src="/static/sidebar.js" defer></script>
     <script>
       const chatBox = document.getElementById("chat-box");
       const userInput = document.getElementById("user-input");
       const sendBtn = document.getElementById("send-btn");
-
-      let complaintTypes = [];
-      let awaitingComplaintType = false;
-      let selectedComplaintType = "";
-      let complaintTypeFormDiv = null;
+      const micBtn = document.getElementById("mic-btn");
+      const micIcon = document.getElementById("mic-icon");
+      let recognition;
+      let isRecognizing = false;
+      let lastInputWasVoice = false;
+      let currentlySpeakingUtterance = null;
 
       // India greeting logic
       function getIndiaGreeting() {
@@ -47,18 +57,15 @@
         return "Hello";
       }
 
-      // Fetch complaint types from backend
-      async function fetchComplaintTypes() {
-        const response = await fetch("/complaint_types");
-        complaintTypes = await response.json();
-      }
-
-      function appendAgentGreetingAndType() {
-        // Only one agent message for greeting
+      // Remove complaint type logic and always show input
+      function showAgentGreeting() {
         const greeting = getIndiaGreeting();
-        chatBox.innerHTML = `<div><b>Agent:</b> ${greeting}, and welcome to the Ethics Complaint Submission Assistant. I'll help you file your concern confidentially and ensure it reaches the appropriate review team.<br><br><strong>First, please select the type of complaint you're reporting:</strong><br><span class="status-indicator">Only one can be selected</span></div>`;
-        // Add the complaint type selection form below
-        showComplaintTypeInChat();
+        const msgId = `agent-msg-greeting`;
+        chatBox.innerHTML = `<div class="agent-message" id="${msgId}">
+          <div class="agent-message-content"><b>Agent:</b> ${greeting}, and welcome to the Ethics Complaint Submission Assistant. Please describe your complaint in as much detail as possible. You can also ask about any law or policy, or check your complaint details or status.</div>
+          <div class='speaker-btn audio-btn' title='Speak'><svg class='speaker-icon' viewBox='0 0 24 24'><polygon points='11 5 6 9 2 9 2 15 6 15 11 19 11 5'/><path d='M15.54 8.46a5 5 0 0 1 0 7.07'/><path d='M19.07 4.93a10 10 0 0 1 0 14.14'/></svg></div>
+        </div>`;
+        attachSpeakerHandlers();
       }
 
       function appendUserMessage(msg) {
@@ -66,94 +73,21 @@
         chatBox.scrollTop = chatBox.scrollHeight;
       }
       
-      function appendAgentMessage(msg) {
-        chatBox.innerHTML += `<div><b>Agent:</b> ${msg}</div>`;
+      function appendAgentMessage(msg, autoSpeak = false) {
+        const msgId = `agent-msg-${Date.now()}-${Math.floor(Math.random()*10000)}`;
+        chatBox.innerHTML += `<div class="agent-message" id="${msgId}">
+          <div class="agent-message-content"><b>Agent:</b> ${msg}</div>
+          <div class='speaker-btn audio-btn' title='Speak'><svg class='speaker-icon' viewBox='0 0 24 24'><polygon points='11 5 6 9 2 9 2 15 6 15 11 19 11 5'/><path d='M15.54 8.46a5 5 0 0 1 0 7.07'/><path d='M19.07 4.93a10 10 0 0 1 0 14.14'/></svg></div>
+        </div>`;
         chatBox.scrollTop = chatBox.scrollHeight;
-        // If complaint is successfully logged, show the new complaint button
-        if (msg.includes('Your complaint has been logged') || msg.includes('Thank you. Your complaint has been logged')) {
-          showFileNewComplaintButton();
+        attachSpeakerHandlers();
+        if (autoSpeak) {
+          speakText(msg, msgId);
         }
       }
 
-      function showComplaintTypeInChat() {
-        // Remove any existing form
-        if (complaintTypeFormDiv) complaintTypeFormDiv.remove();
-        complaintTypeFormDiv = document.createElement("div");
-        complaintTypeFormDiv.style.margin = "10px 0";
-        complaintTypeFormDiv.style.background = "none";
-        complaintTypeFormDiv.style.border = "none";
-        complaintTypeFormDiv.style.padding = "0";
-        // Only the radio list, no extra agent message
-        complaintTypeFormDiv.innerHTML = `
-                <div id="complaint-type-options"></div>
-            `;
-        chatBox.appendChild(complaintTypeFormDiv);
-        const complaintTypeOptions = complaintTypeFormDiv.querySelector(
-          "#complaint-type-options"
-        );
-        complaintTypeOptions.innerHTML = "";
-        complaintTypes.forEach((type) => {
-          const id = "complaint_" + type.replace(/\s+/g, "_").toLowerCase();
-          const label = document.createElement("label");
-          label.className = "complaint-type-option";
-          label.innerHTML = `<input type="radio" class="complaint-type-radio" name="complaint_type" value="${type}" id="${id}"> ${type}`;
-          complaintTypeOptions.appendChild(label);
-        });
-        awaitingComplaintType = true;
-        selectedComplaintType = "";
-        let lastChecked = null;
-        // Reset lower input and send button
-        userInput.value = "";
-        userInput.disabled = true;
-        sendBtn.disabled = true;
-        userInput.style.display = "";
-        sendBtn.style.display = "";
-        userInput.placeholder = "Type your message...";
-        userInput.style.display = "";
-        complaintTypeOptions
-          .querySelectorAll("input[type=radio]")
-          .forEach((radio) => {
-            radio.onclick = function (e) {
-              // Allow deselect
-              if (lastChecked === this) {
-                this.checked = false;
-                lastChecked = null;
-                selectedComplaintType = "";
-                sendBtn.disabled = true;
-                userInput.disabled = true;
-                userInput.value = "";
-                userInput.style.display = "";
-                return;
-              }
-              lastChecked = this;
-            };
-            radio.onchange = function () {
-              selectedComplaintType = this.value;
-              if (this.value.toLowerCase() === "other") {
-                userInput.disabled = false;
-                userInput.value = "";
-                userInput.style.display = "";
-                userInput.placeholder = "Please specify your complaint type...";
-                sendBtn.disabled = true;
-                userInput.focus();
-                userInput.oninput = function () {
-                  sendBtn.disabled = !userInput.value.trim();
-                };
-              } else {
-                userInput.disabled = true;
-                userInput.value = "";
-                userInput.style.display = "";
-                userInput.placeholder = "Type your message...";
-                sendBtn.disabled = false;
-                userInput.oninput = null;
-              }
-            };
-          });
-      }
-
-      // Add loader logic
+      // Loader logic remains unchanged
       function showAgentLoaderWithDelay() {
-        // Only show loader if not already present
         if (document.getElementById('agent-loader')) return;
         window._agentLoaderTimeout = setTimeout(() => {
           if (!document.getElementById('agent-loader')) {
@@ -174,85 +108,153 @@
 
       sendBtn.onclick = async function (e) {
         e.preventDefault();
-        if (awaitingComplaintType) {
-          if (!selectedComplaintType) return;
-          let message;
-          if (selectedComplaintType.toLowerCase() === "other") {
-            if (!userInput.value.trim()) {
-              userInput.focus();
-              return;
-            }
-            message = userInput.value.trim();
-          } else {
-            message = selectedComplaintType;
+        let message = userInput.value;
+        if (!message.trim()) return;
+        appendUserMessage(message);
+        userInput.value = "";
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        if (!lastInputWasVoice) lastInputWasVoice = false;
+        showAgentLoaderWithDelay();
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+        const data = await response.json();
+        removeAgentLoader();
+        appendAgentMessage(data.response, lastInputWasVoice);
+        lastInputWasVoice = false;
+      };
+
+      // Voice input logic
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = function() {
+          isRecognizing = true;
+          micBtn.classList.add('active', 'recording');
+          statusText.textContent = 'Microphone Active';
+          statusText.classList.add('active');
+        };
+        recognition.onend = function() {
+          isRecognizing = false;
+          micBtn.classList.remove('recording');
+          micBtn.classList.remove('active');
+          statusText.textContent = 'Microphone Inactive';
+          statusText.classList.remove('active');
+          if (userInput.value.trim()) {
+            sendBtn.click();
           }
-          appendUserMessage(message);
-          complaintTypeFormDiv.querySelectorAll('input[type=radio]').forEach(radio => {
-            radio.disabled = true;
-          });
-          awaitingComplaintType = false;
-          userInput.value = "";
-          userInput.disabled = false;
-          userInput.placeholder = "Type your message...";
-          sendBtn.disabled = false;
-          // Show loader with delay while waiting for response
-          showAgentLoaderWithDelay();
-          
-          // Send to backend
-          const response = await fetch("/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message }),
-          });
-          const data = await response.json();
-          removeAgentLoader();
-          appendAgentMessage(data.response);
-          userInput.style.display = "";
-          sendBtn.style.display = "";
-          userInput.focus();
-          
+        };
+        recognition.onerror = function(event) {
+          isRecognizing = false;
+          micBtn.classList.remove('recording');
+          micBtn.classList.remove('active');
+          statusText.textContent = 'Mic Error: ' + event.error;
+          statusText.classList.remove('active');
+        };
+        recognition.onresult = function(event) {
+          const transcript = event.results[0][0].transcript;
+          userInput.value = transcript;
+          lastInputWasVoice = true;
+          sendBtn.click();
+          recognition.stop();
+        };
+      }
+
+      micBtn.onclick = function(e) {
+        e.preventDefault();
+        if (!recognition) {
+          statusText.textContent = 'Speech recognition not supported in this browser.';
+          return;
+        }
+        if (isRecognizing) {
+          recognition.stop();
+          if (userInput.value.trim()) {
+            sendBtn.click();
+          }
         } else {
-          let message = userInput.value;
-          if (!message.trim()) return;
-          appendUserMessage(message);
-          userInput.value = "";
-          userInput.disabled = false;
-          sendBtn.disabled = false;
-          // Show loader with delay while waiting for response
-          showAgentLoaderWithDelay();
-          
-          const response = await fetch("/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message }),
-          });
-          const data = await response.json();
-          removeAgentLoader();
-          appendAgentMessage(data.response);
+          recognition.start();
         }
       };
 
-      // On load, show greeting and complaint type selection in chatbox
-      window.onload = async function () {
-        await fetchComplaintTypes();
-        appendAgentGreetingAndType();
+      // Voice output logic
+      function speakText(text, msgId) {
+        if (!('speechSynthesis' in window)) return;
+        if (currentlySpeakingUtterance) {
+          window.speechSynthesis.cancel();
+        }
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-IN';
+        utterance.rate = 1.35;
+        utterance.pitch = 1.1;
+
+        const voices = window.speechSynthesis.getVoices();
+        const preferredVoice = voices.find(v =>
+          (v.lang === 'en-IN' && /Google|Neural|Natural/i.test(v.name))
+          || /Google UK English Female|Google US English/i.test(v.name)
+        );
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+
+        currentlySpeakingUtterance = utterance;
+        utterance.onend = function() {
+          currentlySpeakingUtterance = null;
+          const icon = document.querySelector(`#${msgId} .speaker-btn`);
+          if (icon) icon.classList.remove('active', 'playing');
+        };
+        utterance.onerror = function() {
+          currentlySpeakingUtterance = null;
+          const icon = document.querySelector(`#${msgId} .speaker-btn`);
+          if (icon) icon.classList.remove('active', 'playing');
+        };
+        const icon = document.querySelector(`#${msgId} .speaker-btn`);
+        if (icon) icon.classList.add('active', 'playing');
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function attachSpeakerHandlers() {
+        document.querySelectorAll('.agent-message .speaker-btn').forEach(icon => {
+          if (icon._handlerAttached) return;
+          icon._handlerAttached = true;
+          icon.onclick = function(e) {
+            const msgDiv = icon.closest('.agent-message');
+            if (!msgDiv) return;
+            const msgText = msgDiv.innerText.replace(/^Agent:\s*/, '');
+            const msgId = msgDiv.id;
+            if (currentlySpeakingUtterance) {
+              window.speechSynthesis.cancel();
+              currentlySpeakingUtterance = null;
+              icon.classList.remove('active', 'playing');
+            } else {
+              speakText(msgText, msgId);
+            }
+          };
+        });
+      }
+
+      window.onload = function () {
+        showAgentGreeting();
+        userInput.style.display = "";
+        sendBtn.style.display = "";
+        micBtn.style.display = "";
+        userInput.disabled = false;
+        sendBtn.disabled = false;
+        micBtn.disabled = false;
       };
 
-      // Pressing Enter in the input triggers send
       userInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !sendBtn.disabled) {
           e.preventDefault();
           sendBtn.click();
         }
       });
-
-      function showFileNewComplaintButton() {
-        const inputContainer = document.querySelector('.input-container');
-        inputContainer.innerHTML = `<button id="file-new-complaint-btn">File New Complaint</button>`;
-        document.getElementById('file-new-complaint-btn').onclick = function() {
-          window.location.reload();
-        };
-      }
     </script>
   </body>
 </html>

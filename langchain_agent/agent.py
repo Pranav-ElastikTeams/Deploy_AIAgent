@@ -37,84 +37,123 @@ def extract_field_value(question, answer, field):
         return None
     return value
 
+def extract_all_fields_from_message(message):
+    prompt = load_prompt_template('all_fields_extraction_prompt.txt')
+    prompt = prompt.format(message=message)
+    resp = model.generate_content(prompt)
+    raw = resp.text.strip()
+    print(f"\n[Gemini Extraction] All Fields Prompt: {prompt}\nRaw Response: {raw}\n")
+    # Remove code block markers if present
+    if raw.startswith('```json'):
+        raw = raw[len('```json'):].strip()
+    if raw.startswith('```'):
+        raw = raw[len('```'):].strip()
+    if raw.endswith('```'):
+        raw = raw[:-3].strip()
+    print(f"[Gemini Extraction] Cleaned JSON: {raw}\n")
+    try:
+        data = json.loads(raw)
+    except Exception as e:
+        print(f"[Gemini Extraction] JSON decode error: {e}")
+        data = {}
+    return data
+
 # Main agent function with improved flow
+# Now extracts all fields from the first message, then asks for missing fields
+# Only asks for missing info, otherwise logs complaint
+
 def get_agent_response(user_message, conversation_state):
-    # If no state, expect the first user message to be the complaint type
-    if not conversation_state:
-        conversation_state = {
-            'collected': {},
-            'questions': [],
-            'current_q': 0,
-            'confirmed': False
-        }
-        # Save the complaint type from the first user message
-        complaint_type = user_message.strip()
-        conversation_state['collected']['complaint_type'] = complaint_type
-        prompt_template = load_prompt_template('complaint_questions_prompt.txt')
-        prompt = prompt_template.format(complaint_type=complaint_type)
-        resp = model.generate_content(prompt)
-        print(f"\n[Gemini Extraction] Prompt: {prompt}\nResponse: {resp.text.strip()}\n")
-        questions = [q.lstrip('*- ').strip() for q in resp.text.strip().split('\n') if q.strip()]
-        conversation_state['questions'] = questions
-        conversation_state['current_q'] = 0
-        # Ask the first question
-        return (questions[0], conversation_state)
-
-    # If in the middle of asking questions
-    questions = conversation_state.get('questions', [])
-    current_q = conversation_state.get('current_q', 0)
-    collected = conversation_state['collected']
-
-    # Map the order of fields to collect
-    field_order = [
+    required_fields = [
         'complainant',
         'complainant_email',
-        'subject',
-        'staff_role',
+        'complaint_type',
+        'victim_name',
+        'suspect_name',
+        'relation',
         'date',
         'details_summary',
         'evidence_provided'
     ]
-    if 0 <= current_q < len(field_order):
-        field = field_order[current_q]
-        question = questions[current_q]
-        # Use Gemini to extract the value for each field
-        if field == 'details_summary':
-            collected[field] = user_message.strip()
-        else:
-            extracted = extract_field_value(question, user_message, field)
-            if not extracted:
-                return (question, conversation_state)
-            # For date, validate format and ensure not in the future
-            if field == 'date':
+    if not conversation_state:
+        conversation_state = {
+            'collected': {},
+            'current_q': 0,
+            'confirmed': False
+        }
+        # Extract all fields from the first message
+        extracted = extract_all_fields_from_message(user_message)
+        conversation_state['collected'] = extracted
+        # Find missing fields
+        missing = [f for f in required_fields if not extracted.get(f)]
+        conversation_state['missing'] = missing
+        conversation_state['current_q'] = 0
+        # If NO missing fields, log immediately
+        if not missing:
+            data = extracted.copy()
+            data['status'] = evaluate_complaint_status(data.get('details_summary', ''), data.get('evidence_provided', '')).get('status', 'Pending')
+            data['complaint_id'] = generate_complaint_id()
+            data['assigned_officer'] = random.choice(OFFICERS)
+            data['created_at'] = datetime.utcnow()
+            if 'date' in data and isinstance(data['date'], str):
                 try:
-                    date_obj = datetime.strptime(extracted, '%Y-%m-%d').date()
-                    if date_obj > datetime.utcnow().date():
-                        return (question, conversation_state)
+                    data['date'] = datetime.strptime(data['date'], '%Y-%m-%d').date()
                 except Exception:
-                    return (question, conversation_state)
-            # For email, convert to lowercase
-            if field == 'complainant_email' and extracted:
-                extracted = extracted.lower()
-            collected[field] = extracted
+                    data['date'] = None
+            try:
+                log_complaint(data)
+                confirmation = f"Thank you. Your complaint has been logged.\n\nComplaint ID: {data['complaint_id']}\nAssigned Officer: {data['assigned_officer']}\n\nYou will receive a confirmation email shortly. Our team will follow up within 5 business days."
+                conversation_state['confirmed'] = True
+                email_data = {
+                    'Complaint ID': data['complaint_id'],
+                    'Complaint Type': data.get('complaint_type', ''),
+                    'Victim Name': data.get('victim_name', ''),
+                    'Suspect Name': data.get('suspect_name', ''),
+                    'Relation': data.get('relation', ''),
+                    'Date': data.get('date', ''),
+                    'Description': data.get('details_summary', ''),
+                    'Evidence': data.get('evidence_provided', ''),
+                    'Assigned To': data.get('assigned_officer', ''),
+                    'Status': data.get('status', '')
+                }
+                send_ethics_complaint_email(data.get('complainant_email', ''), data.get('complainant', ''), email_data)
+                return (confirmation, conversation_state)
+            except Exception as e:
+                return (f"Error logging complaint: {str(e)}", conversation_state)
+        # If missing fields, ask for the first one
+        if missing:
+            next_field = missing[0]
+            return (f"Please provide the following information: {next_field.replace('_', ' ')}.", conversation_state)
+    # If still missing fields, ask for them one by one
+    missing = conversation_state.get('missing', [])
+    current_q = conversation_state.get('current_q', 0)
+    collected = conversation_state['collected']
+    if missing and current_q < len(missing):
+        field = missing[current_q]
+        value = user_message.strip()
+        if field == 'date':
+            try:
+                date_obj = datetime.strptime(value, '%Y-%m-%d').date()
+                value = str(date_obj)
+            except Exception:
+                return (f"Please provide a valid date (YYYY-MM-DD) for the incident.", conversation_state)
+        if field == 'complainant_email':
+            value = value.lower()
+        collected[field] = value
         conversation_state['collected'] = collected
         conversation_state['current_q'] += 1
         current_q += 1
-        if current_q < len(questions):
-            return (questions[current_q], conversation_state)
-
-    # After all questions, log the complaint
+        if current_q < len(missing):
+            next_field = missing[current_q]
+            return (f"Please provide the following information: {next_field.replace('_', ' ')}.", conversation_state)
+    # After all fields are collected, log the complaint
     if not conversation_state.get('confirmed'):
         data = collected.copy()
-        # Evaluate status using status_checker
         status_result = evaluate_complaint_status(data.get('details_summary', ''), data.get('evidence_provided', ''))
         print(f"[Status Checker] Status: {status_result['status']}, Reason: {status_result['reason']}")
         data['status'] = status_result['status']
         data['complaint_id'] = generate_complaint_id()
         data['assigned_officer'] = random.choice(OFFICERS)
         data['created_at'] = datetime.utcnow()
-
-        # Convert date string to datetime.date object
         if 'date' in data and isinstance(data['date'], str):
             try:
                 data['date'] = datetime.strptime(data['date'], '%Y-%m-%d').date()
@@ -122,14 +161,14 @@ def get_agent_response(user_message, conversation_state):
                 data['date'] = None
         try:
             log_complaint(data)
-            summary = "\n".join([f"{k}: {v}" for k, v in data.items() if k not in ['created_at', 'assigned_officer']])
             confirmation = f"Thank you. Your complaint has been logged.\n\nComplaint ID: {data['complaint_id']}\nAssigned Officer: {data['assigned_officer']}\n\nYou will receive a confirmation email shortly. Our team will follow up within 5 business days."
             conversation_state['confirmed'] = True
-            # Prepare email data
             email_data = {
                 'Complaint ID': data['complaint_id'],
                 'Complaint Type': data.get('complaint_type', ''),
-                'Subject': data.get('subject', ''),
+                'Victim Name': data.get('victim_name', ''),
+                'Suspect Name': data.get('suspect_name', ''),
+                'Relation': data.get('relation', ''),
                 'Date': data.get('date', ''),
                 'Description': data.get('details_summary', ''),
                 'Evidence': data.get('evidence_provided', ''),
@@ -145,11 +184,10 @@ def get_agent_response(user_message, conversation_state):
 
 def get_inquiry_response(user_message, history=None):
     # Always fetch latest complaints data from the database
-    from db.db_utils import get_db_session
+    from db.db_utils import SessionLocal
     from db.models import Complaint
-    session = get_db_session()
-    complaints = session.query(Complaint).all()
-    session.close()
+    with SessionLocal() as session:
+        complaints = session.query(Complaint).all()
     def serialize(complaint):
         return {
             'complaint_id': complaint.complaint_id,
@@ -157,12 +195,13 @@ def get_inquiry_response(user_message, history=None):
             'complainant': complaint.complainant,
             'complainant_email': complaint.complainant_email,
             'complaint_type': complaint.complaint_type,
-            'subject': complaint.subject,
+            'victim_name': complaint.victim_name,
+            'suspect_name': complaint.suspect_name,
+            'relation': complaint.relation,
             'details_summary': complaint.details_summary,
             'evidence_provided': complaint.evidence_provided,
             'status': complaint.status,
             'assigned_officer': complaint.assigned_officer,
-            'staff_role': complaint.staff_role,
             'created_at': str(complaint.created_at)
         }
     complaints_data = [serialize(c) for c in complaints]
