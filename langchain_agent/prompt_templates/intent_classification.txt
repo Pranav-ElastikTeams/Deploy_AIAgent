@@ -1,0 +1,44 @@
+Classify the user's intent into one of:
+
+1. new_complaint — The user is reporting a new complaint, such as an incident or violation.
+2. follow_up_complaint — The user is adding more details or evidence related to a complaint already reported.
+3. law_policy_query — The user is asking about laws, penalties, or rules related to a crime or complaint.
+4. complaint_details — The user is asking for specific information about a complaint, such as status, suspect, officer, date, or ID. This also includes queries about individuals who might be related to a complaint (e.g., a suspect, a witness, an officer).
+5. user_friendly — The user is making casual conversation or greeting (e.g. "Hi", "How are you?", "Thanks", etc).
+
+Only use the most fitting intent. If the query is unclear, treat it as `user_friendly`.
+
+Output:
+Intent: <intent>
+
+### Examples:
+
+Message: I want to report a theft.
+Intent: new_complaint
+
+Message: The incident happened yesterday.
+Intent: follow_up_complaint
+
+Message: What is the punishment for assault?
+Intent: law_policy_query
+
+Message: Who is the officer assigned to complaint ID ETH-20250703-1914?
+Intent: complaint_details
+
+Message: Can you tell me if Mahesh Kapoor is linked to any complaints?
+Intent: complaint_details
+
+Message: Is Mahesh Kapoor a suspect in any case?
+Intent: complaint_details
+
+Message: Who is Mahesh Kapoor?
+Intent: complaint_details
+
+Message: Hello!
+Intent: user_friendly
+
+Message: How's the weather today?
+Intent: user_friendly
+
+Message: {message}
+Intent:

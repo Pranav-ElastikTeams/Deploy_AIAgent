@@ -1,0 +1,8 @@
+You are an AI assistant. Determine if the following user message is an attempt to start a new, separate complaint (not a continuation of a previous one). Only answer 'yes' or 'no'.
+
+User Message:
+"""
+{user_message}
+"""
+
+Is this a new complaint? (yes or no): 

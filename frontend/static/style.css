@@ -4,6 +4,13 @@
     box-sizing: border-box;
   }
   
+  html, body {
+    height: 100%;
+    min-height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  
   body {
     background: #0a0e27;
     background-image: 
@@ -11,13 +18,16 @@
       radial-gradient(circle at 80% 80%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
       radial-gradient(circle at 40% 40%, rgba(120, 219, 226, 0.2) 0%, transparent 50%);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    height: 100%;
     min-height: 100vh;
-    padding: 1rem;
+    width: 100vw;
+    padding: 0;
+    margin: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    overflow-x: hidden;
+    overflow: hidden;
   }
   
   /* Animated background particles */
@@ -58,6 +68,12 @@
     animation: slideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    height: 90vh;
+    min-height: 600px;
+    max-height: 98vh;
+    justify-content: flex-start;
   }
   
   @keyframes slideUp {
@@ -109,6 +125,7 @@
     color: #e2e8f0;
     scroll-behavior: smooth;
     position: relative;
+    flex: 1 1 auto;
   }
   
   #chat-box::before {
@@ -145,6 +162,7 @@
     gap: 1rem;
     align-items: stretch;
     margin-top: auto;
+    margin-bottom: 0.25rem;
   }
   
   #user-input {
@@ -436,22 +454,29 @@
   
   /* Mobile responsiveness */
   @media (max-width: 640px) {
-    body {
-      padding: 0.75rem;
+    html, body {
+      height: 100%;
+      min-height: 100vh;
+      width: 100vw;
+      overflow: hidden;
     }
-  
+    body {
+      padding: 0;
+      margin: 0;
+    }
     #chat-container {
-      padding: 2rem;
-      border-radius: 20px;
+      padding: 1.25rem;
+      border-radius: 16px;
       margin: 0;
       min-height: calc(100vh - 1.5rem);
+      max-height: 100vh;
+      height: 98vh;
       display: flex;
       flex-direction: column;
     }
-  
     #chat-box {
-      flex: 1;
-      min-height: 320px;
+      flex: 1 1 auto;
+      min-height: 200px;
       max-height: none;
       margin-bottom: 1.25rem;
       padding: 1.25rem;
@@ -708,7 +733,7 @@
   .status-text {
     font-size: 0.85rem;
     color: #94a3b8;
-    margin-top: 0.5rem;
+    margin-top: 0rem;
     text-align: center;
     transition: all 0.3s ease;
   }
@@ -776,3 +801,22 @@
     width: 16px;
     height: 16px;
   }
+
+.key-status-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+}
+
+.key-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin: 0 4px;
+  background: gray;
+  display: inline-block;
+  border: 1.5px solid #222;
+  transition: background 0.3s;
+}

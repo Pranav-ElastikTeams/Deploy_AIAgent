@@ -1,0 +1,13 @@
+Extract all relevant complaint fields and values from the following user query. Possible fields: complaint_id, complaint_type, victim_name, suspect_name, assigned_officer, status, date, complainant, complainant_email, relation, evidence_provided, details_summary, etc.
+
+User Query:
+{user_message}
+
+Return a JSON array of objects, each with "field" and "value". If multiple values are present, include them all.
+
+Example:
+[
+  {{"field": "complaint_type", "value": "Fraud"}},
+  {{"field": "suspect_name", "value": "Mohit Kapoor"}},
+  {{"field": "status", "value": "Under Review"}}
+] 

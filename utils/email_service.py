@@ -2,6 +2,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 
@@ -11,7 +12,14 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 
 
-def send_ethics_complaint_email(to_email: str, complainant: str, complaint_data: dict):
+def send_ethics_complaint_email(to_email: str, complainant: str, complaint_data: dict) -> None:
+    """
+    Send an acknowledgment email to the complainant with the complaint details.
+    Args:
+        to_email (str): Recipient's email address.
+        complainant (str): Name of the complainant.
+        complaint_data (dict): Complaint details for the email body.
+    """
     msg = EmailMessage()
     msg['Subject'] = f"Complaint Logged: {complaint_data['Complaint ID']}"
     msg['From'] = f"Ethics Case Screener <{EMAIL_ADDRESS}>"
@@ -135,6 +143,6 @@ def send_ethics_complaint_email(to_email: str, complainant: str, complaint_data:
             smtp.starttls()
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             smtp.send_message(msg)
-            print(f"Email sent to {to_email} successfully.")
+            logging.info(f"Email sent to {to_email} successfully.")
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        logging.error(f"Failed to send email to {to_email}: {e}")

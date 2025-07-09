@@ -1,9 +1,0 @@
-Given the selected incident type is {complaint_type}, generate a list of questions to gather data for the following fields:
-complainant (String)
-complainant_email (String)
-Name of the person being complained against (String)
-Role of the person being complained against (String)
-date when the incident occurred (Date)
-detailed summary of the incident (Text)
-evidence provided (String)
-Output only the list of questions. No explanations. Questions should be relevant to a {complaint_type} incident. 

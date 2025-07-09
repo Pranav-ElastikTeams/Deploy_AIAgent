@@ -5,13 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ethics Case Screener</title>
     <link rel="stylesheet" href="/static/style.css" />
-    <link rel="stylesheet" href="/static/sidebar.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   </head>
   <body>
-    {% include 'sidebar.html' %}
     <div id="chat-container">
-      <h1>Ethics Case Screener</h1>
+      <div class="key-status-indicator" id="keyStatusIndicator">
+        <span class="key-dot" id="key-dot-1"></span>
+        <span class="key-dot" id="key-dot-2"></span>
+        <span class="key-dot" id="key-dot-3"></span>
+      </div>
+      <h1 style="margin-top: 0.5rem; margin-bottom: 1rem;">Ethics Case Screener</h1>
       <div id="chat-box"></div>
       <div class="input-container audio-controls">
         <button class="audio-btn mic-btn" id="mic-btn" title="Speak" style="display: none; margin-right: 8px;">
@@ -32,13 +35,14 @@
       </div>
       <div class="status-text" id="status-text">Click mic to speak or type your message</div>
     </div>
-    <script src="/static/sidebar.js" defer></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
     <script>
       const chatBox = document.getElementById("chat-box");
       const userInput = document.getElementById("user-input");
       const sendBtn = document.getElementById("send-btn");
       const micBtn = document.getElementById("mic-btn");
       const micIcon = document.getElementById("mic-icon");
+      const statusText = document.getElementById("status-text");
       let recognition;
       let isRecognizing = false;
       let lastInputWasVoice = false;
@@ -73,10 +77,17 @@
         chatBox.scrollTop = chatBox.scrollHeight;
       }
       
-      function appendAgentMessage(msg, autoSpeak = false) {
+      function appendAgentMessage(msg, agentType = '', autoSpeak = false) {
         const msgId = `agent-msg-${Date.now()}-${Math.floor(Math.random()*10000)}`;
+        // Only two agent types: Complaint Agent and Policy Agent
+        let agentLabel = 'Policy Agent';
+        if (agentType === 'complaint') {
+          agentLabel = 'Complaint Agent';
+        } else if (agentType === 'inquiry' || agentType === 'user_friendly') {
+          agentLabel = 'Policy Agent';
+        }
         chatBox.innerHTML += `<div class="agent-message" id="${msgId}">
-          <div class="agent-message-content"><b>Agent:</b> ${msg}</div>
+          <div class="agent-message-content"><b>${agentLabel}:</b> ${msg}</div>
           <div class='speaker-btn audio-btn' title='Speak'><svg class='speaker-icon' viewBox='0 0 24 24'><polygon points='11 5 6 9 2 9 2 15 6 15 11 19 11 5'/><path d='M15.54 8.46a5 5 0 0 1 0 7.07'/><path d='M19.07 4.93a10 10 0 0 1 0 14.14'/></svg></div>
         </div>`;
         chatBox.scrollTop = chatBox.scrollHeight;
@@ -123,7 +134,7 @@
         });
         const data = await response.json();
         removeAgentLoader();
-        appendAgentMessage(data.response, lastInputWasVoice);
+        appendAgentMessage(data.response, data.agent, lastInputWasVoice);
         lastInputWasVoice = false;
       };
 
@@ -173,6 +184,14 @@
           statusText.textContent = 'Speech recognition not supported in this browser.';
           return;
         }
+        // Turn off all speakers and stop any current utterance
+        if (currentlySpeakingUtterance) {
+          window.speechSynthesis.cancel();
+          currentlySpeakingUtterance = null;
+          document.querySelectorAll('.agent-message .speaker-btn').forEach(icon => {
+            icon.classList.remove('active', 'playing');
+          });
+        }
         if (isRecognizing) {
           recognition.stop();
           if (userInput.value.trim()) {
@@ -189,6 +208,14 @@
         if (currentlySpeakingUtterance) {
           window.speechSynthesis.cancel();
         }
+        // Turn off mic if active
+        if (isRecognizing && recognition) {
+          recognition.stop();
+        }
+        // Turn off all speaker icons
+        document.querySelectorAll('.agent-message .speaker-btn').forEach(icon => {
+          icon.classList.remove('active', 'playing');
+        });
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'en-IN';
         utterance.rate = 1.35;
@@ -224,20 +251,71 @@
           if (icon._handlerAttached) return;
           icon._handlerAttached = true;
           icon.onclick = function(e) {
+            // Turn off mic if active
+            if (isRecognizing && recognition) {
+              recognition.stop();
+            }
+            // Only speak the message content, not the agent label
             const msgDiv = icon.closest('.agent-message');
             if (!msgDiv) return;
-            const msgText = msgDiv.innerText.replace(/^Agent:\s*/, '');
+            const contentDiv = msgDiv.querySelector('.agent-message-content');
+            if (!contentDiv) return;
+            let msgText = contentDiv.innerHTML.replace(/<b>.*?<\/b>\s*:?/, '').replace(/^[\s:]+/, '');
+            msgText = msgText.replace(/<[^>]+>/g, ''); // Remove any other HTML tags
             const msgId = msgDiv.id;
-            if (currentlySpeakingUtterance) {
+            // If this icon is already active, toggle off
+            if (icon.classList.contains('active')) {
               window.speechSynthesis.cancel();
               currentlySpeakingUtterance = null;
               icon.classList.remove('active', 'playing');
-            } else {
-              speakText(msgText, msgId);
+              return;
             }
+            // Otherwise, stop any current utterance and deactivate all speakers
+            window.speechSynthesis.cancel();
+            currentlySpeakingUtterance = null;
+            document.querySelectorAll('.agent-message .speaker-btn').forEach(btn => btn.classList.remove('active', 'playing'));
+            // Start the new utterance
+            speakText(msgText, msgId);
           };
         });
       }
+
+      // Key status indicator logic (moved from sidebar.js)
+      function updateKeyStatusIndicator(statusArr) {
+        for (let i = 0; i < 3; i++) {
+          const dot = document.getElementById(`key-dot-${i+1}`);
+          if (!dot) continue;
+          if (statusArr[i] === true) {
+            dot.style.background = 'green';
+          } else {
+            dot.style.background = 'red';
+          }
+        }
+      }
+      function fetchKeyStatusAndUpdate() {
+        fetch('/api/gemini_key_status')
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data.status)) {
+              updateKeyStatusIndicator(data.status);
+            }
+          })
+          .catch(err => {
+            // fallback: all red if error
+            updateKeyStatusIndicator([false, false, false]);
+          });
+      }
+      // Initial call and poll every 30s
+      fetchKeyStatusAndUpdate();
+      setInterval(fetchKeyStatusAndUpdate, 30000);
+
+      // Socket.IO real-time updates
+      const socket = io();
+      socket.on('key_status_update', function(data) {
+        if (Array.isArray(data.status)) {
+          updateKeyStatusIndicator(data.status);
+        }
+      });
 
       window.onload = function () {
         showAgentGreeting();
